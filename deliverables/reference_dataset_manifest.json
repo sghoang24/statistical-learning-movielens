@@ -1,0 +1,52 @@
+{
+  "outputs": {
+    "eligible_movies.csv": {
+      "rows": 17965,
+      "sha256": "f78f5d29d7297ae41e14bf7a58e1f74005d0a1e9f47daec142b205fd061d5217"
+    },
+    "mappings/test/movie_index.csv": {
+      "rows": 45074,
+      "sha256": "f4571a04bbe399f43eb2c6143dc04a09ab5ffe052d0c10ad0cec750adf577246"
+    },
+    "mappings/test/user_index.csv": {
+      "rows": 150543,
+      "sha256": "502bc81041f6dbcf929282e495d7ff6ff9bab383292b9f553f344443c5d77fec"
+    },
+    "mappings/validation/movie_index.csv": {
+      "rows": 37363,
+      "sha256": "4d93a812254f763407d8e0ebcfedfb2895852ee2c56f4975500d63bc5229a99a"
+    },
+    "mappings/validation/user_index.csv": {
+      "rows": 142184,
+      "sha256": "7132e94636eb5a2c3d618d709fef79049e160433e0a5607eeeb00d7d77fb6bae"
+    },
+    "validation_positives.csv": {
+      "rows": 169368,
+      "sha256": "c53589582f2f372e69707fee78362520b70e99caac4eb0ee55d75ac41ba0252e"
+    }
+  },
+  "rules": {
+    "eligibility_history": "strictly before validation_start",
+    "exclude_previously_rated": true,
+    "min_movie_ratings": 10,
+    "min_user_ratings": 1,
+    "positive_rating_strictly_above": 3.0,
+    "training_mappings": "All distinct IDs before each phase cutoff, sorted and zero-based"
+  },
+  "schema_version": 1,
+  "source": {
+    "dataset": "MovieLens 25M",
+    "path": "data/raw/ml-25m/ratings.csv",
+    "rows": 25000095,
+    "sha256": "9c85525758597dca76e8d98cebb9c13e018c2317b09a0878b6d383179526e385"
+  },
+  "training_history_rows": {
+    "test": 22488700,
+    "validation": 20798765
+  },
+  "utc_unix_cutoffs": {
+    "test_end_exclusive": 1577836800,
+    "test_start": 1514764800,
+    "validation_start": 1483228800
+  }
+}

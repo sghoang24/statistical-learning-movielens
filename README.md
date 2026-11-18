@@ -163,6 +163,15 @@ python -m src.prepare_datasets
 
 # Run the popularity baseline on the 2017 validation set
 python -m src.run_popularity_validation
+
+# Phase 2: self-checks for the standalone models and shared pipeline
+python -m src.check_phase2
+
+# Phase 2: fit and benchmark all standalone models (writes outputs/)
+python -m src.run_phase2_validation
+
+# Phase 2: hyperparameter tuning grids and validation selection
+python -m src.tune_models
 ```
 
 ## Project structure

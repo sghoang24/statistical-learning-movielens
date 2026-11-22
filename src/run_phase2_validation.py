@@ -1,7 +1,12 @@
 """P2.6-P2.8 shared runner: fit standalone models, rank, score, and time them."""
 
+import dataclasses
+import hashlib
 import json
 import platform
+import subprocess
+from datetime import datetime, timezone
+from functools import partial
 from pathlib import Path
 from time import perf_counter
 
@@ -10,9 +15,8 @@ import pandas as pd
 import psutil
 
 from src.bias import BiasModel
-from src.item_cf import ItemCFModel
-from src.matrix_factorization import MatrixFactorizationModel
 from src.metrics import mae, rmse
+from src.models import RATING_MAX, RATING_MIN, clip_rating
 from src.pipeline import (
     EvaluationCohort,
     recommendations_frame,
@@ -21,6 +25,7 @@ from src.pipeline import (
 from src.popularity import PopularityModel
 from src.ratings import load_ratings
 from src.splits import TEST_START, VALIDATION_START
+from src.tune_models import FALLBACK_SETTINGS, MODEL_FACTORIES
 
 PROCESSED = Path("data/processed")
 OUTPUT_DIR = Path("outputs")
@@ -28,18 +33,81 @@ OUTPUT_DIR = Path("outputs")
 CATALOGUE_PATH = PROCESSED / "eligible_movies.csv"
 POSITIVES_PATH = PROCESSED / "validation_positives.csv"
 
+# P2.5 selection across the original and extension grids (src.tune_extension).
+SELECTED_CONFIG_PATH = OUTPUT_DIR / "phase2_selected_config_extended.json"
+
+# Settings each personalized model must take from the selection file. Other
+# constructor arguments keep their defaults, exactly as in src.tune_models.
+REQUIRED_SETTINGS = {
+    "bias": ("lambda_user", "lambda_movie"),
+    "item_cf": ("top_k", "min_similarity"),
+    "matrix_factorization": ("n_factors", "regularization"),
+}
+
 PROCESS = psutil.Process()
 
-# Configurations frozen from the P2.5 validation selection
-# (outputs/phase2_selected_config.json).
-DEFAULT_MODELS = {
-    "popularity": lambda: PopularityModel(),
-    "bias": lambda: BiasModel(lambda_user=20.0, lambda_movie=20.0, max_passes=20),
-    "item_cf": lambda: ItemCFModel(top_k=50, min_similarity=0.0),
-    "matrix_factorization": lambda: MatrixFactorizationModel(
-        n_factors=16, regularization=15.0, lambda_user=10.0, lambda_movie=10.0
-    ),
-}
+
+def load_selected_config(path: Path | None = None) -> dict[str, dict]:
+    """Read the P2.5 selection and check every required setting is present."""
+    path = SELECTED_CONFIG_PATH if path is None else Path(path)
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"Selected configuration file not found: {path}. "
+            "Run `python -m src.tune_extension` to create it."
+        )
+    selection = json.loads(path.read_text(encoding="utf-8"))
+    problems = []
+    for model, keys in REQUIRED_SETTINGS.items():
+        params = selection.get(model)
+        if not isinstance(params, dict):
+            problems.append(f"missing model '{model}'")
+            continue
+        missing = [key for key in keys if key not in params]
+        unexpected = sorted(set(params).difference(keys))
+        if missing:
+            problems.append(f"'{model}' is missing {missing}")
+        if unexpected:
+            problems.append(f"'{model}' has unexpected settings {unexpected}")
+    if problems:
+        raise ValueError(f"Invalid selected configuration in {path}: " + "; ".join(problems))
+    return {model: dict(selection[model]) for model in REQUIRED_SETTINGS}
+
+
+def build_model_factories(selection: dict[str, dict]) -> dict:
+    """Popularity plus each personalized model built as in src.tune_models."""
+    factories = {"popularity": PopularityModel}
+    for model in REQUIRED_SETTINGS:
+        factories[model] = partial(MODEL_FACTORIES[model], **selection[model])
+    return factories
+
+
+def output_paths(model_names) -> list[Path]:
+    """Every file this runner writes, so stale results can be cleared first."""
+    paths = [
+        OUTPUT_DIR / "phase2_validation_summary.csv",
+        OUTPUT_DIR / "phase2_validation_environment.json",
+    ]
+    for name in model_names:
+        paths.append(OUTPUT_DIR / f"phase2_validation_{name}_user_metrics.csv")
+        paths.append(OUTPUT_DIR / f"phase2_validation_{name}_top10.csv")
+    return paths
+
+
+def git_state() -> dict[str, object]:
+    """Best-effort code version for the experiment log (plan section 10.3)."""
+    try:
+        commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+        ).stdout.strip()
+        dirty = bool(
+            subprocess.run(
+                ["git", "status", "--porcelain", "--untracked-files=no"],
+                capture_output=True, text=True, check=True,
+            ).stdout.strip()
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return {"git_commit": None, "git_uncommitted_changes": None}
+    return {"git_commit": commit, "git_uncommitted_changes": dirty}
 
 
 def build_cohort(history: pd.DataFrame) -> EvaluationCohort:
@@ -85,15 +153,27 @@ def load_rating_pairs(cohort: EvaluationCohort) -> pd.DataFrame:
     return outcomes.drop_duplicates(["userId", "movieId"]).reset_index(drop=True)
 
 
+def rating_predictions(model, fallback, pairs: pd.DataFrame) -> np.ndarray:
+    """Star predictions for RMSE/MAE: fallback-filled, then clipped to [0.5, 5].
+
+    Unsupported (non-finite) predictions take the fallback's value. The final
+    clip covers model and fallback values alike; ranking never uses this path.
+    """
+    predicted = np.asarray(model.predict(pairs), dtype=np.float64)
+    if not np.isfinite(predicted).all():
+        fallback_predicted = fallback.predict(pairs)
+        predicted = np.where(np.isfinite(predicted), predicted, fallback_predicted)
+    return clip_rating(predicted)
+
+
 def evaluate_all(
     history: pd.DataFrame,
     rating_pairs: pd.DataFrame,
     model_factories: dict,
 ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame], dict[str, list[list[int]]]]:
     cohort = build_cohort(history)
-    fallback = BiasModel(lambda_user=20.0, lambda_movie=20.0, max_passes=20).fit(
-        history
-    )
+    # Same fallback as P2.5 tuning, used for both ranking scores and rating pairs.
+    fallback = BiasModel(**FALLBACK_SETTINGS).fit(history)
 
     summary_rows = []
     user_frames: dict[str, pd.DataFrame] = {}
@@ -129,12 +209,7 @@ def evaluate_all(
         }
         if hasattr(model, "predict"):
             try:
-                predicted = model.predict(rating_pairs)
-                if not np.isfinite(predicted).all():
-                    fallback_predicted = fallback.predict(rating_pairs)
-                    predicted = np.where(
-                        np.isfinite(predicted), predicted, fallback_predicted
-                    )
+                predicted = rating_predictions(model, fallback, rating_pairs)
                 actual = rating_pairs["rating"].to_numpy(dtype=np.float64)
                 row["rmse"] = rmse(actual, predicted)
                 row["mae"] = mae(actual, predicted)
@@ -153,6 +228,22 @@ def evaluate_all(
 
 
 def main() -> None:
+    # Validate the selection before any data loading or fitting.
+    config_path = SELECTED_CONFIG_PATH
+    config_bytes = config_path.read_bytes() if config_path.is_file() else None
+    selection = load_selected_config(config_path)
+    model_factories = build_model_factories(selection)
+    print(f"Selected configurations from {config_path}:")
+    print(json.dumps(selection, indent=2, sort_keys=True))
+    print(f"Fallback for non-finite scores: bias {FALLBACK_SETTINGS}")
+
+    # Remove earlier results first so a failed run cannot leave old benchmark
+    # files that look like they came from this selection.
+    for path in output_paths(model_factories):
+        if path.exists():
+            path.unlink()
+            print(f"Removed previous output {path}")
+
     history = load_validation_history()
     print(f"Validation history rows: {len(history):,}")
     cohort = build_cohort(history)
@@ -160,7 +251,7 @@ def main() -> None:
     print(f"Rating-prediction pairs: {len(rating_pairs):,}")
 
     summary, user_frames, ranked_lists = evaluate_all(
-        history, rating_pairs, DEFAULT_MODELS
+        history, rating_pairs, model_factories
     )
 
     OUTPUT_DIR.mkdir(exist_ok=True)
@@ -183,7 +274,21 @@ def main() -> None:
         "total_memory_mb": round(psutil.virtual_memory().total / (1024**2), 1),
         "evaluated_users": int(len(next(iter(user_frames.values())))),
         "rating_pairs": int(len(rating_pairs)),
-        "models": list(DEFAULT_MODELS),
+        "models": list(model_factories),
+        "run_completed_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        **git_state(),
+        "selected_config_file": config_path.as_posix(),
+        "selected_config_sha256": hashlib.sha256(config_bytes).hexdigest(),
+        "selected_configurations": selection,
+        # Full constructor settings, including defaults (passes, tolerance,
+        # clipping, seed), for each model as run.
+        "model_settings": {
+            name: dataclasses.asdict(factory())
+            for name, factory in model_factories.items()
+        },
+        "fallback": {"model": "bias", **FALLBACK_SETTINGS},
+        # RMSE/MAE use predictions clipped to this range; ranking is unclipped.
+        "rating_metric_clip": [RATING_MIN, RATING_MAX],
     }
     with (OUTPUT_DIR / "phase2_validation_environment.json").open(
         "w", encoding="utf-8", newline="\n"

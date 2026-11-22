@@ -240,29 +240,31 @@ For top-10 ranking, use full-precision raw predictions. The global mean and user
 
 Full detail is recorded in `deliverables/MovieLens_P2_Standalone_Benchmarks.md`.
 
-| Task | Current state and evidence                                                                                                                                                                                                                                                                                       |
-| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P2.1 | Locally verified. `src/popularity.py` ranks eligible movies by pre-2017 rating count. Reproduces the P1.5 reference exactly (NDCG@10 0.075212, coverage 287).                                                                                                                                                    |
-| P2.2 | Locally verified. `src/bias.py` fits `mu + b_u + b_i` with alternating regularized updates (lambda 20, 20 passes). Validation NDCG@10 0.038258, RMSE 0.8517.                                                                                                                                                     |
-| P2.3 | Locally verified. `src/item_cf.py` uses adjusted-cosine top-50 neighbours and item-mean residual blending. Validation NDCG@10 0.018596, coverage 7,467, RMSE 0.8702.                                                                                                                                             |
-| P2.4 | Locally verified. `src/matrix_factorization.py` fits explicit ALS with biases (n_factors 16, reg 15, 20 passes). Best standalone model: NDCG@10 0.095399, RMSE 0.7988.                                                                                                                                           |
-| P2.5 | Complete. `src/tune_models.py` explores three documented settings per personalized model on 2017 validation and selects the best by mean NDCG@10. Selected: bias lambda 20/20, Item-CF top_k 50, MF 16 factors / reg 15. Recorded in `outputs/phase2_selected_config.json` and `outputs/phase2_tuning_grid.csv`. |
-| P2.6 | Locally verified. `src/pipeline.py` scores the full candidate grid, excludes each user's pre-cutoff ratings, and takes top 10 with ascending movieId tie-break. Common to all models.                                                                                                                            |
-| P2.7 | Locally verified. NDCG@10, Recall@10, coverage, less-popular exposure, RMSE and MAE computed in `src/metrics.py` and written per model.                                                                                                                                                                          |
-| P2.8 | Locally verified. Fit time, score time and peak RSS recorded in `phase2_validation_summary.csv` and `phase2_validation_environment.json` (16 CPUs, 32 GB RAM).                                                                                                                                                   |
-| P2.9 | Pending. Local self-checks pass in `src/check_phase2.py`; independent reproduction and teammate review remain to be recorded.                                                                                                                                                                                    |
+| Task | Current state and evidence |
+| ---- | -------------------------- |
+| P2.1 | Locally verified. `src/popularity.py` ranks eligible movies by pre-2017 rating count. Reproduces the P1.5 reference exactly (NDCG@10 0.075212, coverage 287). |
+| P2.2 | Locally verified. `src/bias.py` fits `mu + b_u + b_i` with alternating regularized updates (λ 320/320, ≤20 passes). Validation NDCG@10 0.052504, RMSE 0.8769. |
+| P2.3 | Locally verified after a fix. `src/item_cf.py` now scores each candidate from its own top-K neighbours (the original run read them the other way round). Adjusted-cosine top-3 neighbours with item-mean residual blending: validation NDCG@10 0.059745, coverage 4,627, RMSE 0.8796. 95.1% of the score grid is filled by the bias fallback. |
+| P2.4 | Locally verified. `src/matrix_factorization.py` fits explicit ALS with biases (24 factors, reg 30, ≤20 iterations). Best standalone model: NDCG@10 0.095484, RMSE 0.7991. Convergence evidence (iterations, training RMSE) is computed but not yet saved. |
+| P2.5 | Locally verified. `src/tune_models.py` (base grid) and `src/tune_extension.py` (targeted extensions) select by mean 2017 NDCG@10, coverage as tie-break. Budgets are unequal (bias 7, Item-CF 9, MF 8 settings). Selected: bias λ 320/320, Item-CF top_k 3, MF 24 factors / reg 30, in `outputs/phase2_selected_config_extended.json`. Bias λ=320 and Item-CF k=3 are grid edges. |
+| P2.6 | Locally verified. `src/pipeline.py` scores the full candidate grid, excludes each user's pre-cutoff ratings, and takes top 10 with ascending movieId tie-break. Common to all models. Missing scores use a separate bias fallback (λ 10/10) shared by tuning and the runner. |
+| P2.7 | Locally verified. NDCG@10, Recall@10, coverage, less-popular exposure, RMSE and MAE computed in `src/metrics.py` and written per model. RMSE/MAE use predictions clipped to [0.5, 5]; ranking uses unclipped scores. Independent ranking-metric check passed for all four models using src/check_phase2_metrics.py (tolerance 1e-12). |
+| P2.8 | Locally verified. Fit time, score time and an RSS reading after scoring (not a per-model peak) recorded in `phase2_validation_summary.csv`; hardware, settings and code version in `phase2_validation_environment.json` (20 CPUs, 16 GB RAM). |
+| P2.9 | Pending. The full validation run (22 November 2026) reproduced the tuning results exactly and local self-checks pass in `src/check_phase2.py`; independent reproduction and teammate review remain to be recorded. |
 
 ### Phase 2 ranking benchmark
 
-| Model                | Mean NDCG@10 | Mean Recall@10 | Coverage |   RMSE |
-| -------------------- | -----------: | -------------: | -------: | -----: |
-| Popularity           |     0.075212 |       0.023637 |      287 |      — |
-| Bias                 |     0.038258 |       0.013524 |       81 | 0.8517 |
-| Item-CF              |     0.018596 |       0.007146 |    7,467 | 0.8702 |
-| Matrix factorization |     0.095399 |       0.040035 |    1,506 | 0.7988 |
+| Model | Configuration | Mean NDCG@10 | Mean Recall@10 | Coverage | Less-popular exposure | RMSE | MAE |
+| ----- | ------------- | -----------: | -------------: | -------: | --------------------: | ---: | --: |
+| Popularity | Pre-2017 rating count | 0.075212 | 0.023637 | 287 | 0.0000 | — | — |
+| Bias | λ 320 / 320 | 0.052504 | 0.018621 | 154 | 0.0002 | 0.8769 | 0.6596 |
+| Item-CF | top_k 3 | 0.059745 | 0.025483 | 4,627 | 0.1593 | 0.8796 | 0.6497 |
+| Matrix factorization | 24 factors, reg 30 | **0.095484** | **0.040890** | 1,182 | 0.2726 | **0.7991** | **0.5902** |
 
-Results use the P2.5-selected configurations. Matrix factorization is the
-strongest standalone model on the agreed validation metric.
+Results use the extended P2.5 selections from the full validation run. Matrix
+factorization is the strongest standalone model on the agreed validation
+metric (27.0% above popularity) and is the validation-selected comparator for
+Phase 3. Bias and Item-CF both rank below popularity on NDCG@10.
 
 ### Phase 2 Deliverables
 

@@ -1,0 +1,123 @@
+{
+  "cohort": {
+    "movie_ids_sha256": "6305a786bfbf0e46c8b4addb3754bfdf841200504c76d7499c9458e3046b954c",
+    "n_movies": 17965,
+    "n_users": 4778,
+    "users_sha256": "2fad14e412d4d8f8f1bf5b2aa37121055d645ea9a05d0c28c0158ce956a6bd07"
+  },
+  "endpoints": {
+    "w0_matrix_factorization": {
+      "fallback_count_matches_components": true,
+      "grid_equal": true,
+      "grid_max_abs_difference": 0.0,
+      "lists_equal": true,
+      "mismatched_users_vs_in_process": 0,
+      "seconds": 10.7,
+      "standalone_fallback_filled": 0,
+      "w": 0.0
+    },
+    "w1_item_cf": {
+      "fallback_count_matches_components": true,
+      "grid_equal": true,
+      "grid_max_abs_difference": 0.0,
+      "lists_equal": true,
+      "mismatched_users_vs_in_process": 0,
+      "seconds": 11.87,
+      "standalone_fallback_filled": 81597241,
+      "w": 1.0
+    }
+  },
+  "fallback_counts": {
+    "grid_cells": 85836770,
+    "item_cf": 81597241,
+    "item_cf_fallback_share": 0.9506094066680282,
+    "mf": 0
+  },
+  "grid_cache": {
+    "content_sha256": "f732ba17c4a0e03f6fcc549a3c80ee822b9b0f47a9d5de5c09c09fa7d3c0a71a",
+    "path": "artifacts/grids/hybrid-components-before-2017-01-01.npz",
+    "status": "built"
+  },
+  "model_artifacts": {
+    "fallback": {
+      "content_sha256": "2bab97ff5eca814ac9e41e05ccbcb9cb719b00357c4751f6901c85a7d516782d",
+      "path": "artifacts/models/fallback-before-2017-01-01.npz"
+    },
+    "item_cf": {
+      "content_sha256": "cd4dacb263c939888c740662e1ab4917e0fc6bb3f880eb9b62a869a07b58faed",
+      "path": "artifacts/models/item_cf-before-2017-01-01.npz"
+    },
+    "matrix_factorization": {
+      "content_sha256": "7dfd8b7c819a855fd2aa23ac6f1292c04f0161769ffd0defcfe2cded8597123f",
+      "path": "artifacts/models/matrix_factorization-before-2017-01-01.npz"
+    }
+  },
+  "model_settings": {
+    "fallback": {
+      "lambda_movie": 10.0,
+      "lambda_user": 10.0,
+      "max_passes": 20,
+      "seed": 0,
+      "tolerance": 1e-06
+    },
+    "item_cf": {
+      "min_similarity": 0.0,
+      "top_k": 3
+    },
+    "matrix_factorization": {
+      "lambda_movie": 10.0,
+      "lambda_user": 10.0,
+      "max_iter": 20,
+      "monitor_clip_max": 5.0,
+      "monitor_clip_min": 1.0,
+      "n_factors": 24,
+      "regularization": 30.0,
+      "seed": 0,
+      "tolerance": 0.0001
+    }
+  },
+  "passed_in_process_endpoints": true,
+  "provenance": {
+    "created_utc": "2026-11-22T14:21:41+00:00",
+    "git_commit": "1213c4d4af758665dbe9546b15edbe03c60a3d4a",
+    "git_uncommitted_changes": true,
+    "numpy": "2.5.4",
+    "pandas": "3.1.1",
+    "python": "3.13.2",
+    "raw_ratings_sha256": "9c85525758597dca76e8d98cebb9c13e018c2317b09a0878b6d383179526e385",
+    "scipy": "1.18.1"
+  },
+  "run_completed_utc": "2026-11-22T14:21:41+00:00",
+  "saved_phase2_comparison": {
+    "item_cf_vs_w1": {
+      "available": true,
+      "file": "outputs/phase2_validation_item_cf_top10.csv",
+      "mismatched_users": 0,
+      "mismatched_users_same_movies_different_order": 0,
+      "users_compared": 4778,
+      "users_in_file_not_in_cohort": 0,
+      "users_missing_from_file": 0
+    },
+    "matrix_factorization_vs_w0": {
+      "available": true,
+      "file": "outputs/phase2_validation_matrix_factorization_top10.csv",
+      "mismatched_users": 0,
+      "mismatched_users_same_movies_different_order": 0,
+      "users_compared": 4778,
+      "users_in_file_not_in_cohort": 0,
+      "users_missing_from_file": 0
+    }
+  },
+  "task": "P3.1 hybrid endpoint check (2017 validation)",
+  "total_seconds": 421.5,
+  "training_cutoff_utc": 1483228800,
+  "training_history": {
+    "rows": 20798765,
+    "sha256": "25b049613331bbd2caeca02657228f569e2c5b56096c5ada9e8b425747a309e8"
+  },
+  "w1_top10_direct_item_cf": {
+    "direct_item_cf_slots": 45031,
+    "direct_share": 0.942465466722478,
+    "slots": 47780
+  }
+}

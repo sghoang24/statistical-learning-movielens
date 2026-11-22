@@ -2,6 +2,9 @@
 data/raw/
 data/processed/
 
+# Fitted model artifacts (local only; see src/model_artifacts.py)
+artifacts/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

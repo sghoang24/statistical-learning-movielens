@@ -1,0 +1,136 @@
+{
+  "cohort": {
+    "movie_ids_sha256": "6305a786bfbf0e46c8b4addb3754bfdf841200504c76d7499c9458e3046b954c",
+    "n_movies": 17965,
+    "n_users": 4778,
+    "users_sha256": "2fad14e412d4d8f8f1bf5b2aa37121055d645ea9a05d0c28c0158ce956a6bd07"
+  },
+  "comparison_with_mf_comparator": {
+    "comparator": "w=0 (matrix factorization)",
+    "delta_coverage_movies": 193,
+    "delta_less_popular_exposure": 0.033779824194223484,
+    "delta_mean_ndcg_at_10": 0.0031307092760677613,
+    "delta_mean_recall_at_10": 0.0008972410139460804,
+    "mean_shared_top10_movies": 7.654667224780243,
+    "selected_w": 0.2,
+    "total_hits_top10": {
+      "mf": 3949,
+      "selected": 4062
+    },
+    "total_hits_top3": {
+      "mf": 1441,
+      "selected": 1499
+    },
+    "users_fewer_hits_top10": 451,
+    "users_fewer_hits_top3": 200,
+    "users_more_hits_top10": 526,
+    "users_more_hits_top3": 264,
+    "users_ndcg_equal": 2905,
+    "users_ndcg_higher": 1000,
+    "users_ndcg_lower": 873
+  },
+  "endpoint_confirmation": {
+    "checks": {
+      "endpoint_report_passed": true,
+      "item_cf_vs_w1_lists": true,
+      "matrix_factorization_vs_w0_lists": true,
+      "same_cohort": true,
+      "same_fallback_counts": true,
+      "same_grid_cache": true,
+      "same_training_history": true,
+      "same_w1_direct_slots": true
+    },
+    "report": "outputs/phase3_hybrid_endpoint_check.json",
+    "report_sha256": "adcf2e4702d8097af6d690c41f83773ef812938eec8d62d3eb2b0dbbe4b22812"
+  },
+  "grid_cache": {
+    "component_settings": {
+      "fallback": {
+        "lambda_movie": 10.0,
+        "lambda_user": 10.0,
+        "max_passes": 20,
+        "seed": 0,
+        "tolerance": 1e-06
+      },
+      "item_cf": {
+        "min_similarity": 0.0,
+        "top_k": 3
+      },
+      "matrix_factorization": {
+        "lambda_movie": 10.0,
+        "lambda_user": 10.0,
+        "max_iter": 20,
+        "monitor_clip_max": 5.0,
+        "monitor_clip_min": 1.0,
+        "n_factors": 24,
+        "regularization": 30.0,
+        "seed": 0,
+        "tolerance": 0.0001
+      }
+    },
+    "content_sha256": "f732ba17c4a0e03f6fcc549a3c80ee822b9b0f47a9d5de5c09c09fa7d3c0a71a",
+    "fallback_counts": {
+      "item_cf": 81597241,
+      "mf": 0
+    },
+    "model_artifact_sha256": {
+      "fallback": "2bab97ff5eca814ac9e41e05ccbcb9cb719b00357c4751f6901c85a7d516782d",
+      "item_cf": "cd4dacb263c939888c740662e1ab4917e0fc6bb3f880eb9b62a869a07b58faed",
+      "matrix_factorization": "7dfd8b7c819a855fd2aa23ac6f1292c04f0161769ffd0defcfe2cded8597123f"
+    },
+    "path": "artifacts/grids/hybrid-components-before-2017-01-01.npz"
+  },
+  "outputs": {
+    "plot": "outputs/phase3_weight_sweep.png",
+    "selected_top10": "outputs/phase3_selected_hybrid_top10.csv",
+    "selection": "outputs/phase3_provisional_selection.json",
+    "table": "outputs/phase3_weight_sweep.csv",
+    "user_metrics": "outputs/phase3_weight_sweep_user_metrics.csv"
+  },
+  "provenance": {
+    "created_utc": "2026-11-22T14:38:16+00:00",
+    "git_commit": "1213c4d4af758665dbe9546b15edbe03c60a3d4a",
+    "git_uncommitted_changes": true,
+    "numpy": "2.5.4",
+    "pandas": "3.1.1",
+    "python": "3.13.2",
+    "raw_ratings_sha256": "9c85525758597dca76e8d98cebb9c13e018c2317b09a0878b6d383179526e385",
+    "scipy": "1.18.1"
+  },
+  "run_completed_utc": "2026-11-22T14:38:16+00:00",
+  "selected_metrics": {
+    "coverage_fraction": 0.07653771221820206,
+    "coverage_movies": 1375,
+    "direct_item_cf_slot_share": 0.509648388447049,
+    "less_popular_exposure": 0.30640435328589366,
+    "mean_ndcg_at_10": 0.09861443120323132,
+    "mean_recall_at_10": 0.04178719196730403
+  },
+  "selected_w": 0.2,
+  "selection_rule": "Highest mean 2017 validation NDCG@10 among interior weights 0.1-0.9 at full precision; exact ties go to the weight closest to 0.5, then to the smaller weight. w=0 (MF) and w=1 (Item-CF) are references and cannot be selected.",
+  "status": "provisional",
+  "status_note": "Provisional validation selection. P3.3 freezes the weight after team review; it must not be changed after any 2018-2019 scoring.",
+  "task": "P3.2 validation weight sweep",
+  "total_seconds": 61.9,
+  "training_cutoff_utc": 1483228800,
+  "training_history": {
+    "rows": 20798765,
+    "sha256": "25b049613331bbd2caeca02657228f569e2c5b56096c5ada9e8b425747a309e8"
+  },
+  "weights_evaluated": [
+    0.0,
+    0.1,
+    0.2,
+    0.3,
+    0.4,
+    0.5,
+    0.6,
+    0.7,
+    0.8,
+    0.9,
+    1.0
+  ],
+  "weights_tied_at_best_ndcg": [
+    0.2
+  ]
+}

@@ -1,0 +1,297 @@
+{
+  "document": "P3.3 frozen experiment configuration - DRAFT",
+  "status": "draft_pending_all_member_approval",
+  "status_note": "Proposed values for team review. Nothing here is frozen until all three members approve each decision below. No 2018-2019 data has been read or scored.",
+  "decisions": {
+    "comparator": {
+      "proposal": "matrix_factorization",
+      "rule": "Stronger standalone personalized model by mean 2017 validation NDCG@10 (P1.6; exact tie -> Item-CF).",
+      "evidence": {
+        "matrix_factorization_ndcg_at_10": 0.09548372192716356,
+        "item_cf_ndcg_at_10": 0.05974505098491088
+      },
+      "status": "pending",
+      "approved_by": {
+        "A": null,
+        "B": null,
+        "C": null
+      },
+      "date": null
+    },
+    "hybrid_item_cf_weight": {
+      "proposal": 0.2,
+      "mf_weight": 0.8,
+      "rule": "Highest mean 2017 validation NDCG@10 among interior weights 0.1-0.9 at full precision; exact ties go to the weight closest to 0.5, then to the smaller weight. w=0 (MF) and w=1 (Item-CF) are references and cannot be selected.",
+      "weights_evaluated": [
+        0.0,
+        0.1,
+        0.2,
+        0.3,
+        0.4,
+        0.5,
+        0.6,
+        0.7,
+        0.8,
+        0.9,
+        1.0
+      ],
+      "weights_tied_at_best_ndcg": [
+        0.2
+      ],
+      "validation_metrics": {
+        "coverage_fraction": 0.07653771221820206,
+        "coverage_movies": 1375,
+        "direct_item_cf_slot_share": 0.509648388447049,
+        "less_popular_exposure": 0.30640435328589366,
+        "mean_ndcg_at_10": 0.09861443120323132,
+        "mean_recall_at_10": 0.04178719196730403
+      },
+      "status": "pending",
+      "approved_by": {
+        "A": null,
+        "B": null,
+        "C": null
+      },
+      "date": null
+    },
+    "component_settings": {
+      "proposal": {
+        "fallback": {
+          "lambda_movie": 10.0,
+          "lambda_user": 10.0,
+          "max_passes": 20,
+          "seed": 0,
+          "tolerance": 1e-06
+        },
+        "item_cf": {
+          "min_similarity": 0.0,
+          "top_k": 3
+        },
+        "matrix_factorization": {
+          "lambda_movie": 10.0,
+          "lambda_user": 10.0,
+          "max_iter": 20,
+          "monitor_clip_max": 5.0,
+          "monitor_clip_min": 1.0,
+          "n_factors": 24,
+          "regularization": 30.0,
+          "seed": 0,
+          "tolerance": 0.0001
+        }
+      },
+      "source": "outputs/phase2_selected_config_extended.json via src.model_artifacts.component_specs",
+      "notes": {
+        "matrix_factorization.monitor_clip_min/monitor_clip_max": "Fitting setting only: clips the training RMSE used by MF's tolerance stop. Not applied to predictions, ranking or the hybrid, and not the hybrid clipping rule."
+      },
+      "status": "pending",
+      "approved_by": {
+        "A": null,
+        "B": null,
+        "C": null
+      },
+      "date": null
+    },
+    "scoring_and_ranking_rules": {
+      "proposal": {
+        "alignment": "both components scored on the same ordered original userId/movieId arrays",
+        "missing_scores": "missing or non-finite component scores filled with the shared fallback bias model (settings above) before blending; counts recorded per component",
+        "blend": "hybrid = w * item_cf + (1 - w) * mf on the raw, unclipped component scores",
+        "ranking": "blended scores ranked without clipping; movies the user rated before the recommendation date excluded after blending (cohort.rank_top_k); exact ties broken by ascending movieId; 10 movies returned",
+        "rating_metrics": "for RMSE/MAE, blend the raw scores first, then clip the resulting rating prediction once to [0.5, 5]",
+        "rating_metrics_clip": [
+          0.5,
+          5.0
+        ]
+      },
+      "protocol_amendment": {
+        "id": "P1.6 amendment A1",
+        "document": "deliverables/MovieLens_P1.6_Meaningful_Improvement.md",
+        "original_wording": "Use full-precision predictions on the original rating scale and apply any clipping consistently before the blend.",
+        "proposed_rule": "the rule in 'proposal' above",
+        "status": "pending",
+        "note": "Protocol changes require approval by all three members; approving this decision includes approving A1."
+      },
+      "status": "pending",
+      "approved_by": {
+        "A": null,
+        "B": null,
+        "C": null
+      },
+      "date": null
+    },
+    "practical_margin": {
+      "proposal": 0.01,
+      "units": "absolute mean observed-positive NDCG@10 (hybrid - comparator)",
+      "status_note": "Provisional P1.6 value presented for review. Must not be revised merely to clear the observed validation gain; record keep/revise and reasons.",
+      "validation_evidence": {
+        "comparator": "w=0 (matrix factorization)",
+        "delta_coverage_movies": 193,
+        "delta_less_popular_exposure": 0.033779824194223484,
+        "delta_mean_ndcg_at_10": 0.0031307092760677613,
+        "delta_mean_recall_at_10": 0.0008972410139460804,
+        "mean_shared_top10_movies": 7.654667224780243,
+        "selected_w": 0.2,
+        "total_hits_top10": {
+          "mf": 3949,
+          "selected": 4062
+        },
+        "total_hits_top3": {
+          "mf": 1441,
+          "selected": 1499
+        },
+        "users_fewer_hits_top10": 451,
+        "users_fewer_hits_top3": 200,
+        "users_more_hits_top10": 526,
+        "users_more_hits_top3": 264,
+        "users_ndcg_equal": 2905,
+        "users_ndcg_higher": 1000,
+        "users_ndcg_lower": 873
+      },
+      "runtime_evidence_provisional": {
+        "status": "provisional",
+        "phase2_fit_seconds": {
+          "matrix_factorization": 230.5953006000491,
+          "item_cf": 229.4774744999595,
+          "bias_lambda_320": 4.714858699939214
+        },
+        "phase2_hardware": "20 logical CPUs, 16 GB RAM (phase2_validation_environment.json)",
+        "fallback_fit_seconds": null,
+        "fallback_fit_note": "lambda=10 fallback fit not timed separately",
+        "p32_sweep_total_seconds": 61.9,
+        "p32_sweep_note": "Cache-based evaluation of all eleven weights; no fitting or scoring. Not a single hybrid's end-to-end runtime.",
+        "configured_hybrid_end_to_end_seconds": null,
+        "configured_hybrid_note": "Not yet measured; required in the final evaluation."
+      },
+      "status": "pending",
+      "approved_by": {
+        "A": null,
+        "B": null,
+        "C": null
+      },
+      "date": null
+    },
+    "uncertainty": {
+      "proposal": {
+        "method": "paired user-level bootstrap on the final-test cohort",
+        "statistic": "mean of d_u = NDCG@10_hybrid(u) - NDCG@10_MF(u)",
+        "resamples": 10000,
+        "seed": 42,
+        "resample_size": "number of evaluated test users, with replacement",
+        "interval": "two-sided 95% percentile (2.5th and 97.5th percentiles)",
+        "proposed_implementation": "numpy.random.default_rng(42); resample user indices; numpy.percentile default (linear) interpolation"
+      },
+      "decision_table": "P1.6 'Paired uncertainty and decision rule' (strict comparisons)",
+      "status": "pending",
+      "approved_by": {
+        "A": null,
+        "B": null,
+        "C": null
+      },
+      "date": null
+    },
+    "final_test_plan": {
+      "proposal": {
+        "refit_history": "all ratings before 2018-01-01 UTC (including 2017)",
+        "refit_history_rows_expected": 22488700,
+        "refit_models": "Item-CF, MF and fallback with the frozen settings and seeds; no retuning",
+        "recommendation_date_utc": 1514764800,
+        "scoring_window_utc": [
+          1514764800,
+          1577836800
+        ],
+        "catalogue": "fixed 17,965-movie pre-2017 catalogue (unchanged)",
+        "less_popular_classification": "fixed top 3,593 by pre-2017 count (ties by movieId)",
+        "user_eligibility": "at least one pre-2017 rating (frozen P1.2 rule)",
+        "positives": "2018-2019 ratings > 3 on catalogue movies not rated before 2018-01-01",
+        "evaluated_users": "eligible users with at least one test positive",
+        "exclusions": "all movies the user rated before 2018-01-01",
+        "popularity_reference": "recount on pre-2018 ratings; reported separately",
+        "report": "all three NDCG@10 means (hybrid, MF, Item-CF), paired difference and interval; Recall@10, coverage, less-popular exposure",
+        "runtime_required": "Measure and report the configured hybrid's full runtime, from fitting Item-CF, MF and the fallback through scoring, blending and top-10 generation, under the same conditions as MF alone; report the amortized sweep cost separately (P1.6).",
+        "not_yet_implemented": "test positives file and final-test runner (P3.9)"
+      },
+      "status": "pending",
+      "approved_by": {
+        "A": null,
+        "B": null,
+        "C": null
+      },
+      "date": null
+    },
+    "phase_gates": {
+      "proposal": "Record P1.9 and P2.9 approvals before final-test scoring",
+      "status": "pending",
+      "approved_by": {
+        "A": null,
+        "B": null,
+        "C": null
+      },
+      "date": null
+    }
+  },
+  "validation_evidence_files": {
+    "provisional_selection": {
+      "path": "outputs/phase3_provisional_selection.json",
+      "sha256_lf": "d9d035d9584f58ab461d2faed4d4fd32d4bc444209246e1615833128fdd21877"
+    },
+    "weight_sweep_table": {
+      "path": "outputs/phase3_weight_sweep.csv",
+      "sha256_lf": "afc1ae7a8cb9d8fce3ca606ea1b0a8fa3abe7c3b75f0329009dd9efa46e7bba1"
+    },
+    "endpoint_check": {
+      "path": "outputs/phase3_hybrid_endpoint_check.json",
+      "sha256": "adcf2e4702d8097af6d690c41f83773ef812938eec8d62d3eb2b0dbbe4b22812"
+    },
+    "weight_sweep_plot": "outputs/phase3_weight_sweep.png",
+    "selected_top10": "outputs/phase3_selected_hybrid_top10.csv"
+  },
+  "identities": {
+    "training_cutoff_utc": 1483228800,
+    "training_history": {
+      "rows": 20798765,
+      "sha256": "25b049613331bbd2caeca02657228f569e2c5b56096c5ada9e8b425747a309e8"
+    },
+    "raw_ratings_sha256": "9c85525758597dca76e8d98cebb9c13e018c2317b09a0878b6d383179526e385",
+    "cohort": {
+      "movie_ids_sha256": "6305a786bfbf0e46c8b4addb3754bfdf841200504c76d7499c9458e3046b954c",
+      "n_movies": 17965,
+      "n_users": 4778,
+      "users_sha256": "2fad14e412d4d8f8f1bf5b2aa37121055d645ea9a05d0c28c0158ce956a6bd07"
+    },
+    "grid_cache": {
+      "path": "artifacts/grids/hybrid-components-before-2017-01-01.npz",
+      "content_sha256": "f732ba17c4a0e03f6fcc549a3c80ee822b9b0f47a9d5de5c09c09fa7d3c0a71a",
+      "model_artifact_sha256": {
+        "fallback": "2bab97ff5eca814ac9e41e05ccbcb9cb719b00357c4751f6901c85a7d516782d",
+        "item_cf": "cd4dacb263c939888c740662e1ab4917e0fc6bb3f880eb9b62a869a07b58faed",
+        "matrix_factorization": "7dfd8b7c819a855fd2aa23ac6f1292c04f0161769ffd0defcfe2cded8597123f"
+      },
+      "fallback_counts": {
+        "item_cf": 81597241,
+        "mf": 0
+      }
+    },
+    "endpoint_check_passed": true
+  },
+  "code_provenance": {
+    "run_base_commit": "1213c4d4af758665dbe9546b15edbe03c60a3d4a",
+    "run_git_uncommitted_changes": true,
+    "endpoint_run_completed_utc": "2026-11-22T14:21:41+00:00",
+    "sweep_run_completed_utc": "2026-11-22T14:38:16+00:00",
+    "subsequent_source_snapshot_commit": "6df249b9c4bf14cea0977bc173f9290f67d82bd9",
+    "subsequent_snapshot_committed": "2026-11-22T15:04:58+00:00",
+    "note": "The endpoint check and sweep ran on base commit 1213c4d with uncommitted changes. Commit 6df249b was made after both runs to record the source snapshot and outputs; the runs were not made from a clean checkout of 6df249b.",
+    "snapshot_verification": "SHA-256 of src/hybrid.py, src/pipeline.py, src/item_cf.py, src/matrix_factorization.py, src/bias.py and src/models.py recorded in the grid cache and model artifacts equal those files at 6df249b. Runner and cache modules (run_hybrid_endpoints.py, run_hybrid_sweep.py, grid_cache.py, model_artifacts.py) were not hashed at run time; the commit records their state as committed afterwards but cannot independently prove that those exact file versions are the ones that ran.",
+    "libraries": {
+      "python": "3.13.2",
+      "numpy": "2.5.4",
+      "pandas": "3.1.1",
+      "scipy": "1.18.1"
+    }
+  },
+  "not_done_in_this_draft": [
+    "no 2018-2019 data read or scored",
+    "no model refit; no sweep rerun",
+    "no Phase 2 output modified"
+  ]
+}

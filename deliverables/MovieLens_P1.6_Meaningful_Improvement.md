@@ -1,6 +1,6 @@
 # MovieLens 25M P1.6 Meaningful Improvement
 
-**Status** — Protocol ready for teammate review. The numeric relevance margin is provisional pending validation.
+**Status** — Protocol ready for teammate review. The numeric relevance margin is provisional pending validation. Proposed amendment A1 (clipping and blending, step 2) is **pending team approval**; see "Proposed amendments" below.
 
 ## Primary comparison
 
@@ -13,7 +13,7 @@ Score Item-CF, MF, and the hybrid on the same eligible test users and candidate 
 The following grid is the proposed initial run plan for P3.1–P3.3. P2.3–P2.5 supply the tuned standalone models and their validation records. The hybrid owner can run this grid once those inputs are available.
 
 1. **Freeze the standalone inputs to the search.** Use the selected Item-CF and MF settings from 2017 validation and fit both components on pre-2017 data. Record each component's configuration, seed, and training policy. Choose the standalone comparator by the higher mean validation NDCG@10 at full precision. Proposed tie rule for an exact tie is Item-CF.
-2. **Prepare aligned rating predictions.** Use the 4,778 primary validation users and their P1.4 candidate sets. Produce one predicted star rating per component for each eligible user–movie pair and align by user ID and movie ID. Retain the full candidate predictions because the blend can promote movies outside both standalone top tens. The proposed fallback for a missing or non-finite prediction is the P2.2 regularized bias baseline fitted on the same phase history. Apply the same fallback in standalone tuning, standalone evaluation, and hybrid evaluation. Record the affected counts per component. Use full-precision predictions on the original rating scale and apply any clipping consistently before the blend. Document and freeze the clipping policy.
+2. **Prepare aligned rating predictions.** Use the 4,778 primary validation users and their P1.4 candidate sets. Produce one predicted star rating per component for each eligible user–movie pair and align by user ID and movie ID. Retain the full candidate predictions because the blend can promote movies outside both standalone top tens. The proposed fallback for a missing or non-finite prediction is the P2.2 regularized bias baseline fitted on the same phase history. Apply the same fallback in standalone tuning, standalone evaluation, and hybrid evaluation. Record the affected counts per component. Use full-precision predictions on the original rating scale. **[Proposed amendment A1, pending team approval — replaces "apply any clipping consistently before the blend":]** Fill missing or non-finite component scores with the shared fallback before blending, blend the raw, unclipped component scores, and rank the blended scores without clipping. For RMSE and MAE, blend the raw scores first, then clip the resulting rating prediction once to [0.5, 5]. Document and freeze the clipping policy.
 3. **Blend predicted ratings and rank.** Use one global Item-CF weight w. For each candidate, compute w × Item-CF predicted rating + (1 − w) × MF predicted rating. Sort by the blended prediction descending, break exact ties by ascending movie ID, and take the first 10. Both components estimate stars, so direct blending preserves their predicted rating gaps. Their prediction spreads can differ even on the same scale. The validation grid measures which weighting works best for ranking.
 4. **Run nine hybrid configurations.** Test Item-CF weights 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, and 0.9. The MF weight is 1 − w. Also run w = 0 and w = 1 as checks that the blend reproduces the MF and Item-CF top tens, respectively. Fit each component once for this grid and reuse its full validation predictions across weights. Compare ordered top-10 movie IDs for every user at each endpoint using the same fallback, clipping, and tie rules.
 5. **Select and record the winner.** Save a row per weight with mean NDCG@10, Recall@10, coverage, less-popular exposure, and timing. Keep the per-user scores and ranked lists for the selected weight and the standalone comparator. Choose the interior weight with the highest mean validation NDCG@10 at full precision. For exact ties, prefer the weight closest to 0.5, then the smaller Item-CF weight. Keep the selected hybrid in the final comparison even if its validation score trails a standalone. For runtime comparisons, measure a single configured hybrid including both components and blending, separately from the amortized cost of the validation sweep.
@@ -47,8 +47,26 @@ Use a paired user-level bootstrap on the final-test cohort. Resample evaluated u
 
 Use strict comparisons for claims that a bound exceeds or is below a threshold. Assess the overall hybrid trade-off alongside the relevance decision using Recall@10, catalogue coverage, less-popular exposure, and measured computational cost.
 
+## Proposed amendments
+
+### A1 — Clipping and blending rule (step 2) — pending team approval
+
+| | Text |
+|---|---|
+| Original wording | "Use full-precision predictions on the original rating scale and apply any clipping consistently before the blend." |
+| Proposed wording | Fill missing or non-finite component scores with the shared fallback before blending, blend the raw, unclipped component scores, and rank the blended scores without clipping. For RMSE and MAE, blend the raw scores first, then clip the resulting rating prediction once to [0.5, 5]. |
+
+**Reason.** This is the rule implemented in `src/hybrid.py` and used in the P3.1 endpoint check and the P3.2 validation sweep. Phase 2 ranked every standalone model on unclipped scores. Clipping before the blend would let scores saturate at 5 and break ties by movie ID, so w = 1 would no longer reproduce the standalone Item-CF ranking. MF's training-RMSE stopping monitor, which clips to [1, 5] while fitting, is a separate fitting setting. It is not part of this prediction or blending rule.
+
+**Status.** Proposed, not yet approved. Protocol changes require approval from all three members. Until it is approved, the P3.1 and P3.2 results should be read as produced under the proposed rule.
+
+| Member A | Member B | Member C | Date |
+|---|---|---|---|
+| Pending | Pending | Pending | |
+
 ## Review checklist
 
 - Confirm the primary comparator selection rule, paired data format, and proposed bootstrap settings.
 - Review the provisional 0.01 margin and the validation evidence required to confirm or revise it.
+- Approve or reject amendment A1 (clipping and blending rule) and record each member's decision.
 - Record the frozen comparator, model settings, margin, and inference settings before final testing.

@@ -314,6 +314,15 @@ The phase is complete when:
 
 P3.4, P3.5, and P3.7 are if-time diagnostics in the task tracker. The approved evaluation protocol still records the four user-history cutoffs for sensitivity analysis.
 
+### Phase 3 execution record
+
+| Task | Current state and evidence |
+| ---- | -------------------------- |
+| P3.1 | Locally verified. `src/hybrid.py` fills missing component scores with the λ=10/10 fallback, blends raw unclipped scores and ranks through the shared pipeline. The 2017 endpoint check (`outputs/phase3_hybrid_endpoint_check.json`) passed: w=0 and w=1 reproduce the standalone MF and Item-CF grids and top-10 lists exactly, and match the saved Phase 2 lists for all 4,778 users. |
+| P3.2 | Provisional. The cache-based sweep of w = 0.0–1.0 selected w = 0.2 (NDCG@10 0.098614, +0.003131 over MF; coverage 1,375, +193). Records: `outputs/phase3_weight_sweep.csv` and `outputs/phase3_provisional_selection.json`. |
+| P3.3 | P3.3 draft pending all-member approval. Draft memo and configuration: `deliverables/MovieLens_P3.3_Frozen_Experiment_Draft.md` and `deliverables/phase3_frozen_experiment_draft.json`. Every decision is pending, including P1.6 amendment A1 (clipping and blending rule) and the provisional 0.01 margin. |
+| P3.4–P3.10 | Not started. P3.9 must not begin until P3.3 is approved and P1.9 and P2.9 approvals are recorded. |
+
 ### Phase 3 Deliverables
 
 - Approved weighted-hybrid implementation

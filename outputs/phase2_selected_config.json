@@ -1,14 +1,14 @@
 {
   "bias": {
-    "lambda_movie": 20.0,
-    "lambda_user": 20.0
+    "lambda_movie": 80.0,
+    "lambda_user": 80.0
   },
   "item_cf": {
     "min_similarity": 0.0,
-    "top_k": 50
+    "top_k": 12
   },
   "matrix_factorization": {
-    "n_factors": 16,
-    "regularization": 15.0
+    "n_factors": 24,
+    "regularization": 30.0
   }
 }

@@ -32,6 +32,20 @@ class RatingModel(Protocol):
         """Return predicted stars aligned to ``pairs`` rows."""
 
 
+RATING_MIN = 0.5
+RATING_MAX = 5.0
+
+
+def clip_rating(prediction: np.ndarray) -> np.ndarray:
+    """Clip star predictions to the MovieLens scale for RMSE/MAE only.
+
+    Ranking always uses raw ``score_candidates`` output; clipping it would turn
+    distinct high scores into ties. ``NaN`` stays ``NaN`` so a fallback can
+    still fill unsupported predictions.
+    """
+    return np.clip(prediction, RATING_MIN, RATING_MAX)
+
+
 def require_history_columns(history: pd.DataFrame) -> None:
     missing = {"userId", "movieId", "rating"}.difference(history.columns)
     if missing:

@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
-from src.models import require_history_columns
+from src.models import clip_rating, require_history_columns
 
 
 @dataclass
@@ -21,8 +21,6 @@ class BiasModel:
     lambda_movie: float = 10.0
     max_passes: int = 20
     tolerance: float = 1e-6
-    clip_min: float | None = None
-    clip_max: float | None = None
     seed: int = 0
     name: str = field(default="bias", init=False)
 
@@ -85,11 +83,6 @@ class BiasModel:
         result[found] = bias[position[found].astype(int)]
         return result
 
-    def _close(self, prediction: np.ndarray) -> np.ndarray:
-        if self.clip_min is not None or self.clip_max is not None:
-            prediction = np.clip(prediction, self.clip_min, self.clip_max)
-        return prediction
-
     def score_candidates(
         self, user_ids: np.ndarray, movie_ids: np.ndarray
     ) -> np.ndarray:
@@ -109,4 +102,4 @@ class BiasModel:
         b_i = self._lookup(
             self.movie_index_, self.bias_movie_, pairs["movieId"].to_numpy()
         )
-        return self._close(self.mu_ + b_u + b_i)
+        return clip_rating(self.mu_ + b_u + b_i)

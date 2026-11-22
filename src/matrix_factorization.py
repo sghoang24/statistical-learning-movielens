@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 
-from src.models import require_history_columns
+from src.models import clip_rating, require_history_columns
 
 
 def _solve_rows(
@@ -38,7 +38,12 @@ class MatrixFactorizationModel:
     Predicts ``mu + b_u + b_i + p_u . q_i``. Each iteration updates user biases,
     movie biases, then the latent factors, and reports the training RMSE. The
     factor count, regularization and pass count are selected on 2017 validation
-    only. Predictions are clipped to the observed star range by default.
+    only. Ranking scores are raw; :meth:`predict` clips to the shared rating
+    range [0.5, 5] (``src.models.clip_rating``) for RMSE/MAE.
+
+    ``monitor_clip_min``/``monitor_clip_max`` only clip the training RMSE used
+    by the tolerance stop. They stay at [1, 5], as in the original fits, so the
+    stopping iteration, fitted factors and top-10 lists are unchanged.
     """
 
     n_factors: int = 24
@@ -48,8 +53,8 @@ class MatrixFactorizationModel:
     max_iter: int = 20
     tolerance: float = 1e-4
     seed: int = 0
-    clip_min: float | None = 1.0
-    clip_max: float | None = 5.0
+    monitor_clip_min: float = 1.0
+    monitor_clip_max: float = 5.0
     name: str = field(default="matrix_factorization", init=False)
 
     def __post_init__(self) -> None:
@@ -116,8 +121,8 @@ class MatrixFactorizationModel:
             factor = np.einsum("ij,ij->i", P[rows], Q[columns])
             prediction = np.clip(
                 self.mu_ + b_u[rows] + b_i[columns] + factor,
-                self.clip_min,
-                self.clip_max,
+                self.monitor_clip_min,
+                self.monitor_clip_max,
             )
             rmse = float(np.sqrt(np.mean((ratings - prediction) ** 2)))
             if abs(previous_rmse - rmse) < self.tolerance:
@@ -131,11 +136,6 @@ class MatrixFactorizationModel:
         self.iterations_ = iteration + 1
         self.training_rmse_ = rmse
         return self
-
-    def _clip(self, prediction: np.ndarray) -> np.ndarray:
-        if self.clip_min is not None or self.clip_max is not None:
-            prediction = np.clip(prediction, self.clip_min, self.clip_max)
-        return prediction
 
     def _lookup(
         self, mapping: pd.Series, values: np.ndarray, keys: np.ndarray
@@ -182,4 +182,4 @@ class MatrixFactorizationModel:
         b_u = self._lookup(self.user_index_, self.bias_user_, user_ids)
         b_i = self._lookup(self.movie_index_, self.bias_movie_, movie_ids)
         factor = np.einsum("ij,ij->i", P, Q)
-        return self._clip(self.mu_ + b_u + b_i + factor)
+        return clip_rating(self.mu_ + b_u + b_i + factor)

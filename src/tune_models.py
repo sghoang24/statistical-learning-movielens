@@ -26,11 +26,11 @@ OUTPUT_DIR = Path("outputs")
 # 2017 validation. Bias and MF fix the second bias regularization at the shipped
 # default so the grid length stays matched across models.
 GRIDS = {
-    "bias": [{"lambda_user": value, "lambda_movie": value} for value in (5.0, 10.0, 20.0)],
-    "item_cf": [{"top_k": k, "min_similarity": 0.0} for k in (50, 100, 200)],
+    "bias": [{"lambda_user": value, "lambda_movie": value} for value in (5.0, 10.0, 20.0, 40.0, 80.0)],
+    "item_cf": [{"top_k": k, "min_similarity": 0.0} for k in (12, 25, 50, 100, 200)],
     "matrix_factorization": [
         {"n_factors": f, "regularization": r}
-        for f, r in ((16, 15.0), (24, 15.0), (24, 10.0))
+        for f, r in ((16, 15.0), (24, 15.0), (24, 10.0), (8, 15.0), (8, 30.0), (16, 30.0), (16, 45.0), (24, 30.0),)
     ],
 }
 
@@ -39,6 +39,11 @@ MODEL_FACTORIES = {
     "item_cf": ItemCFModel,
     "matrix_factorization": MatrixFactorizationModel,
 }
+
+# Bias model that fills non-finite scores (P1.6 fallback). Shared with the
+# P2.6 runner so tuning and benchmark runs use the same fallback; it is
+# deliberately separate from the tuned standalone bias model.
+FALLBACK_SETTINGS = {"lambda_user": 10.0, "lambda_movie": 10.0, "max_passes": 20}
 
 
 def load_history() -> pd.DataFrame:
@@ -58,13 +63,15 @@ def build_cohort(history: pd.DataFrame) -> EvaluationCohort:
     return cohort
 
 
-def tune(history: pd.DataFrame) -> pd.DataFrame:
+def tune(history: pd.DataFrame,
+         grids: dict[str, list[dict]] | None = None,
+         ) -> pd.DataFrame:
+    if grids is None:
+        grids = GRIDS
     cohort = build_cohort(history)
-    fallback = BiasModel(lambda_user=10.0, lambda_movie=10.0, max_passes=20).fit(
-        history
-    )
+    fallback = BiasModel(**FALLBACK_SETTINGS).fit(history)
     rows = []
-    for model_name, grid in GRIDS.items():
+    for model_name, grid in grids.items():
         factory = MODEL_FACTORIES[model_name]
         for params in grid:
             model = factory(**params).fit(history)

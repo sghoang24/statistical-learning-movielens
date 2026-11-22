@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 
-from src.models import require_history_columns
+from src.models import clip_rating, require_history_columns
 
 
 def _top_k_neighbours(similarity: sp.csr_matrix, top_k: int) -> sp.csr_matrix:
@@ -62,8 +62,6 @@ class ItemCFModel:
 
     top_k: int = 100
     min_similarity: float = 0.0
-    clip_min: float | None = None
-    clip_max: float | None = None
     name: str = field(default="item_cf", init=False)
 
     def __post_init__(self) -> None:
@@ -124,11 +122,6 @@ class ItemCFModel:
         self.residuals_ = residuals
         return self
 
-    def _clip(self, prediction: np.ndarray) -> np.ndarray:
-        if self.clip_min is not None or self.clip_max is not None:
-            prediction = np.clip(prediction, self.clip_min, self.clip_max)
-        return prediction
-
     def _user_positions(self, user_ids: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         position = self.user_index_.reindex(np.asarray(user_ids)).to_numpy()
         found = ~pd.isna(position)
@@ -149,7 +142,7 @@ class ItemCFModel:
         known = ~pd.isna(candidate_positions)
         if not known.any():
             return scores
-        shard = self.similarity_[:, candidate_positions[known].astype(int)]
+        shard = self.similarity_.T[:, candidate_positions[known].astype(int)]
         # Similarity-weighted residuals plus the candidate item's training mean.
         numerator = np.asarray((self.residuals_[positions] @ shard).todense())
         weight = np.asarray((self.binary_[positions] @ shard).todense())
@@ -159,7 +152,8 @@ class ItemCFModel:
         item_mean = self.item_mean_[candidate_positions[known].astype(int)]
         values = adjustment + item_mean[None, :]
         scores[np.ix_(rows, np.flatnonzero(known))] = values.astype(np.float32)
-        return self._clip(scores)
+        # Ranking uses full-precision raw predictions; clipping is rating output only.
+        return scores
 
     def predict(self, pairs: pd.DataFrame) -> np.ndarray:
         if not hasattr(self, "similarity_"):
@@ -172,4 +166,5 @@ class ItemCFModel:
             pairs["movieId"].to_numpy(), return_inverse=True
         )
         grid = self.score_candidates(unique_users, unique_movies)
-        return grid[user_inverse, movie_inverse]
+        # NaN (no rated neighbour) survives clipping for the shared fallback.
+        return clip_rating(grid[user_inverse, movie_inverse])

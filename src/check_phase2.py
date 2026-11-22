@@ -13,6 +13,7 @@ import pandas as pd
 from src.bias import BiasModel
 from src.item_cf import ItemCFModel
 from src.matrix_factorization import MatrixFactorizationModel
+from src.models import RATING_MAX, RATING_MIN, clip_rating
 from src.pipeline import EvaluationCohort
 from src.popularity import PopularityModel
 
@@ -56,7 +57,7 @@ def check_bias() -> None:
     print("bias pass")
 
 
-def check_item_cf() -> None:
+def item_cf_history() -> pd.DataFrame:
     # Users who like item 1 also like item 2; item 3 is disliked by everyone.
     pattern = {
         1: [(1, 5), (2, 4), (3, 1)],
@@ -70,8 +71,11 @@ def check_item_cf() -> None:
         for user, items in pattern.items()
         for movie, rating in items
     ]
-    history = pd.DataFrame(rows)
-    model = ItemCFModel(top_k=5, min_similarity=0.0).fit(history)
+    return pd.DataFrame(rows)
+
+
+def check_item_cf() -> None:
+    model = ItemCFModel(top_k=5, min_similarity=0.0).fit(item_cf_history())
     index = model.movie_index_
     assert model.similarity_[index[1], index[2]] > 0, "Co-liked items are similar."
     grid = model.score_candidates(np.array([1]), np.array([2]))
@@ -81,9 +85,8 @@ def check_item_cf() -> None:
     print("item_cf pass")
 
 
-def check_matrix_factorization() -> None:
+def low_rank_history(n_u: int = 50, n_i: int = 30, f: int = 3) -> pd.DataFrame:
     rng = np.random.default_rng(0)
-    n_u, n_i, f = 50, 30, 3
     pu = rng.normal(0, 0.6, (n_u, f))
     qi = rng.normal(0, 0.6, (n_i, f))
     rows = []
@@ -91,10 +94,14 @@ def check_matrix_factorization() -> None:
         for item in rng.choice(n_i, size=15, replace=False):
             rating = float(np.clip(3.0 + pu[user] @ qi[item], 0.5, 5.0))
             rows.append({"userId": user, "movieId": item, "rating": rating})
-    history = pd.DataFrame(rows)
+    return pd.DataFrame(rows)
+
+
+def check_matrix_factorization() -> None:
+    f = 3
     model = MatrixFactorizationModel(
         n_factors=f, regularization=1.0, max_iter=30, tolerance=1e-9, seed=1
-    ).fit(history)
+    ).fit(low_rank_history(f=f))
     assert model.training_rmse_ < 0.4, "Should fit low-rank data."
     grid = model.score_candidates(np.array([0, 1]), np.array([0, 1, 2]))
     assert grid.shape == (2, 3)
@@ -120,12 +127,89 @@ def check_pipeline_excludes_rated() -> None:
     print("pipeline exclusion pass")
 
 
+def _check_clip_distinction(model, movie_attr: str, user: int, a: int, b: int) -> None:
+    """Push fitted per-movie terms out of range; ranking stays raw, ratings clip.
+
+    ``movie_attr`` is the fitted per-movie array added to every score
+    (``bias_movie_`` or ``item_mean_``); shifting it moves the raw score of that
+    movie by the same amount. Requires ``a < b``.
+    """
+    assert a < b
+    base = getattr(model, movie_attr).copy()
+    pos_a, pos_b = model.movie_index_[a], model.movie_index_[b]
+    pairs = pd.DataFrame({"userId": [user, user], "movieId": [a, b]})
+
+    # High end: both movies above 5, with b strictly higher than a.
+    high = base.copy()
+    high[pos_a] += 10
+    high[pos_b] += 20
+    setattr(model, movie_attr, high)
+    raw = model.score_candidates(np.array([user]), np.array([a, b]))
+    assert np.isfinite(raw).all(), f"{model.name}: synthetic scores must be finite."
+    assert raw[0, 0] > RATING_MAX and raw[0, 1] > raw[0, 0], (
+        f"{model.name}: ranking scores must stay unclipped, got {raw}."
+    )
+    assert np.allclose(model.predict(pairs), [RATING_MAX, RATING_MAX]), (
+        f"{model.name}: predict must clip to {RATING_MAX}."
+    )
+    catalogue = pd.DataFrame({"movieId": [a, b], "pre_2017_rating_count": [2, 1]})
+    cohort = EvaluationCohort(catalogue, pd.DataFrame({"userId": [user], "movieId": [a]}))
+    cohort.set_history(pd.DataFrame({"userId": [], "movieId": [], "rating": []}))
+    assert cohort.rank_top_k(raw)[0] == [b, a], "Raw scores keep b above a."
+    # Clipping would tie them at 5 and the tie-break would hand a the top slot.
+    assert cohort.rank_top_k(clip_rating(raw))[0] == [a, b]
+
+    # Low end: a below 0.5 clips up to 0.5 in predict only.
+    low = base.copy()
+    low[pos_a] -= 10
+    setattr(model, movie_attr, low)
+    raw = model.score_candidates(np.array([user]), np.array([a]))
+    assert raw[0, 0] < RATING_MIN, f"{model.name}: low raw score must stay unclipped."
+    assert np.isclose(model.predict(pairs.iloc[:1])[0], RATING_MIN)
+    setattr(model, movie_attr, base)
+
+
+def check_rating_clipping() -> None:
+    """RMSE/MAE inputs clip to [0.5, 5]; ranking scores never clip."""
+    from src.run_phase2_validation import rating_predictions
+
+    bias = BiasModel(lambda_user=0.0, lambda_movie=0.0).fit(synthetic_history())
+    _check_clip_distinction(bias, "bias_movie_", user=1, a=1, b=2)
+    item_cf = ItemCFModel(top_k=5, min_similarity=0.0).fit(item_cf_history())
+    _check_clip_distinction(item_cf, "item_mean_", user=1, a=1, b=2)
+    mf = MatrixFactorizationModel(n_factors=3, regularization=1.0, max_iter=5).fit(
+        low_rank_history(f=3)
+    )
+    _check_clip_distinction(mf, "bias_movie_", user=0, a=0, b=1)
+
+    # Unsupported Item-CF predictions stay NaN so the fallback can fill them.
+    unknown = pd.DataFrame({"userId": [999], "movieId": [1]})
+    assert np.isnan(item_cf.predict(unknown)).all()
+
+    # Runner path: fallback-filled values are clipped too, even if the fallback
+    # itself returned raw out-of-range values.
+    class Stub:
+        def __init__(self, values):
+            self.values = np.asarray(values, dtype=float)
+
+        def predict(self, pairs):
+            return self.values.copy()
+
+    pairs = pd.DataFrame({"userId": [1, 1, 1, 1], "movieId": [1, 2, 3, 4]})
+    model = Stub([6.0, np.nan, 3.2, np.nan])
+    fallback = Stub([0.0, 7.5, 0.0, -1.0])
+    got = rating_predictions(model, fallback, pairs)
+    assert np.allclose(got, [5.0, 5.0, 3.2, 0.5]), got
+    print("rating clipping pass")
+
+
 def main() -> None:
     check_popularity()
     check_bias()
     check_item_cf()
     check_matrix_factorization()
     check_pipeline_excludes_rated()
+    check_rating_clipping()
     print("P2 self-checks passed")
 
 
